@@ -6,9 +6,10 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-tokio = { version = "1", features = ["full"] } # async runtime
-warp = "0.3" # web framework
-rusoto_core = "0.47" # AWS SDK core
-rusoto_s3 = "0.47" # AWS SDK S3
-zip = "0.5" # for creating zip files
-bytes = "1.0" # to work with byte arrays
+tokio = { version = "1", features = ["full"] }
+warp = "0.3"
+aws-config = "0.56.1"
+aws-sdk-s3control = "0.30.0"
+zip = "0.5" 
+bytes = "1.0" 
+dotenv = "0.15.0"
