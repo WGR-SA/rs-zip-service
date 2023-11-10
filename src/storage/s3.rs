@@ -6,8 +6,8 @@ pub struct S3Storage {
 }
 
 impl Storage for S3Storage {
-    fn connect(&self) -> () {
-        ()
+    fn connect(&self) -> bool {
+        true
     }
 
     fn get_files(&self, files: Vec<String>) -> Vec<u8> {

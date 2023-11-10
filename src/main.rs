@@ -1,20 +1,32 @@
+use actix_web::{get, http::header::ContentType, post, web, App, Error, HttpResponse, HttpServer};
 use dotenv::dotenv;
-use warp::Filter;
+use futures::{future::ok, stream::once};
 
 pub mod config;
 pub mod handlers;
 pub mod storage;
 
-#[tokio::main]
-async fn main() {
+#[get("/stream")]
+async fn stream() -> HttpResponse {
+    println!("stream");
+    let body = once(ok::<_, Error>(web::Bytes::from_static(b"stream")));
+
+    HttpResponse::Ok()
+        .content_type(ContentType::json())
+        .streaming(body)
+}
+
+#[post("/zip")]
+async fn zip(req: HttpRequest) -> HttpResponse {
+    handlers::handle_compress_files(req)
+}
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
     dotenv().ok(); // Load variables from `.env`
-
-    println!("Hello, world!");
-
-    let zip = warp::path("zip")
-        .and(warp::body::json())
-        .and(warp::header::header("X-Client"))
-        .map(handlers::handle_compress_files);
-
-    warp::serve(zip).run(([127, 0, 0, 1], 3030)).await;
+    println!("hello");
+    HttpServer::new(|| App::new().service(zip).service(stream))
+        .bind(("127.0.0.1", 3030))?
+        .run()
+        .await
 }

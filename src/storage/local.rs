@@ -6,8 +6,8 @@ pub struct LocalStorage {
 }
 
 impl Storage for LocalStorage {
-    fn connect(&self) -> () {
-        ()
+    fn connect(&self) -> bool {
+        true
     }
 
     fn get_files(&self, files: Vec<String>) -> Vec<u8> {

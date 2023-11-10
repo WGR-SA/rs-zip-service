@@ -29,17 +29,17 @@ fn default() -> StorageConfig {
     }
 }
 
-pub fn get_config(client: String) -> Result<StorageConfig, std::io::Error> {
+pub fn get_config(client: &str) -> Result<StorageConfig, std::io::Error> {
     let config = self::get_from_env(client).unwrap();
 
     Ok(config)
 }
 
-fn get_from_env(client: String) -> Result<StorageConfig, std::io::Error> {
+fn get_from_env(client: &str) -> Result<StorageConfig, std::io::Error> {
     let mut config = self::default();
 
     for (key, value) in env::vars() {
-        let mut prefix = String::from(&client);
+        let mut prefix = String::from(client);
         prefix.push_str("_STORAGE_");
 
         if key.starts_with(&prefix) {
