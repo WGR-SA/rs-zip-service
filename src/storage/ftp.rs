@@ -5,12 +5,12 @@ use crate::storage::ZipFile;
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
-pub struct S3Storage {
+pub struct FtpStorage {
     pub config: config::StorageConfig,
 }
 
 #[async_trait]
-impl Storage for S3Storage {
+impl Storage for FtpStorage {
     async fn connect(&self) -> bool {
         true
     }

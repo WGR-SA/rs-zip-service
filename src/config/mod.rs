@@ -22,7 +22,7 @@ impl StorageConfig {
 
 fn default() -> StorageConfig {
     StorageConfig {
-        provider: String::from("local"),
+        provider: String::from("http"),
         url: String::from(""),
         user: String::from(""),
         secret: String::from(""),
@@ -31,7 +31,7 @@ fn default() -> StorageConfig {
 
 pub fn get_config(client: &str) -> Result<StorageConfig, std::io::Error> {
     let config = self::get_from_env(client).unwrap();
-
+    println!("config: {:?}", config);
     Ok(config)
 }
 

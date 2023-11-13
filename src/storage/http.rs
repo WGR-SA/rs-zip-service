@@ -5,13 +5,14 @@ use crate::storage::ZipFile;
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 
-pub struct S3Storage {
+pub struct HttpStorage {
     pub config: config::StorageConfig,
 }
 
 #[async_trait]
-impl Storage for S3Storage {
+impl Storage for HttpStorage {
     async fn connect(&self) -> bool {
+        println!("connect: to openstack");
         true
     }
 
