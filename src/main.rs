@@ -4,8 +4,7 @@ pub mod zip_stream;
 
 use actix_cors::Cors;
 use actix_web::{
-    http::header::{ContentDisposition, ContentType},
-    post, web, App, Error, HttpRequest, HttpResponse, HttpServer,
+    http::header::ContentDisposition, post, web, App, Error, HttpRequest, HttpResponse, HttpServer,
 };
 use async_zip::base::write::ZipFileWriter;
 use async_zip::Compression;
@@ -15,6 +14,7 @@ use bytes::Bytes;
 use dotenv::dotenv;
 use futures::stream::StreamExt;
 use futures::{io::AsyncWrite, io::AsyncWriteExt};
+use std::env;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
@@ -79,7 +79,10 @@ async fn main() -> std::io::Result<()> {
 
         App::new().wrap(cors).service(get_files_stream_zip)
     })
-    .bind(("127.0.0.1", 3030))?
+    .bind((
+        "127.0.0.1",
+        env::var("PORT").unwrap().parse::<u16>().unwrap(),
+    ))?
     .run()
     .await
 }
