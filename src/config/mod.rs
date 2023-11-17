@@ -6,6 +6,8 @@ pub struct StorageConfig {
     pub url: String,
     pub user: String,
     pub secret: String,
+    pub region: String,
+    pub bucket: String,
 }
 
 impl StorageConfig {
@@ -15,6 +17,8 @@ impl StorageConfig {
             "url" => self.url = value,
             "user" => self.user = value,
             "secret" => self.secret = value,
+            "region" => self.region = value,
+            "bucket" => self.bucket = value,
             _ => println!("unknown key: {}", key),
         }
     }
@@ -26,6 +30,8 @@ fn default() -> StorageConfig {
         url: String::from(""),
         user: String::from(""),
         secret: String::from(""),
+        region: String::from(""),
+        bucket: String::from(""),
     }
 }
 
