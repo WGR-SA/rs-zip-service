@@ -2,7 +2,11 @@ pub mod config;
 pub mod storage;
 pub mod zip_stream;
 
-use actix_web::{post, web, App, Error, HttpRequest, HttpResponse, HttpServer};
+use actix_cors::Cors;
+use actix_web::{
+    http::header::{ContentDisposition, ContentType},
+    post, web, App, Error, HttpRequest, HttpResponse, HttpServer,
+};
 use async_zip::base::write::ZipFileWriter;
 use async_zip::Compression;
 use async_zip::ZipEntryBuilder;
@@ -10,13 +14,10 @@ use async_zip::ZipString;
 use bytes::Bytes;
 use dotenv::dotenv;
 use futures::stream::StreamExt;
-use futures::SinkExt; // Required for try_send
 use futures::{io::AsyncWrite, io::AsyncWriteExt};
-use std::io::ErrorKind;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
-use tokio::sync::mpsc::error::TrySendError;
 use tokio_stream::wrappers::ReceiverStream;
 
 pub struct CustomWriter {
@@ -63,16 +64,33 @@ impl AsyncWrite for CustomWriter {
 async fn main() -> std::io::Result<()> {
     dotenv().ok(); // Load variables from `.env`
     println!("hello");
-    HttpServer::new(|| App::new().service(get_files_stream_zip))
-        .bind(("127.0.0.1", 3030))?
-        .run()
-        .await
+
+    HttpServer::new(|| {
+        let cors = Cors::permissive();
+        // .allowed_origin("*")
+        // .allowed_methods(vec!["GET", "POST"])
+        // .allowed_headers(vec![
+        //     http::header::AUTHORIZATION,
+        //     http::header::ACCEPT,
+        //     http::header::CONTENT_TYPE,
+        //     http::header::HeaderName::from_static("X-Client"),
+        // ])
+        // .max_age(3600);
+
+        App::new().wrap(cors).service(get_files_stream_zip)
+    })
+    .bind(("127.0.0.1", 3030))?
+    .run()
+    .await
 }
 
 #[post("/zip")]
 async fn get_files_stream_zip(req: HttpRequest, body: web::Json<Vec<String>>) -> HttpResponse {
     let client = req.headers().get("X-Client").unwrap().to_str().unwrap();
-    let config: config::StorageConfig = config::get_config(client).unwrap();
+    let config: config::StorageConfig = match config::get_config(client) {
+        Ok(config) => config,
+        Err(_) => return HttpResponse::InternalServerError().body("Error getting config"),
+    };
 
     let storage_instance = storage::get_storage(config);
     if !storage_instance.connect().await {
@@ -86,7 +104,9 @@ async fn get_files_stream_zip(req: HttpRequest, body: web::Json<Vec<String>>) ->
     let mut zip = ZipFileWriter::new(writer);
 
     for path in body.into_inner() {
-        let _is = storage_instance.send_file_stream(&i_sender, path).await;
+        if let Err(_) = storage_instance.send_file_stream(&i_sender, path).await {
+            return HttpResponse::InternalServerError().body("Error sending file stream");
+        }
     }
 
     tokio::spawn(async move {
@@ -95,23 +115,24 @@ async fn get_files_stream_zip(req: HttpRequest, body: web::Json<Vec<String>>) ->
             let mut stream = file_stream.stream;
             let entry =
                 ZipEntryBuilder::new(ZipString::from(file_stream.name), Compression::Deflate);
-            let mut entry_writer = zip.write_entry_stream(entry).await.unwrap();
+            let mut entry_writer = match zip.write_entry_stream(entry).await {
+                Ok(writer) => writer,
+                Err(_) => return,
+            };
             while let Some(Ok(chunk)) = stream.next().await {
-                entry_writer.write_all(&chunk).await.unwrap();
+                if let Err(_) = entry_writer.write_all(&chunk).await {
+                    return;
+                }
             }
             entry_writer.close().await.unwrap();
         }
 
         zip.close().await.unwrap();
     });
-
     println!("Stream opened");
 
     HttpResponse::Ok()
         .content_type("application/zip")
-        .append_header((
-            "ContentDisposition",
-            "attachment; filename=\"download.zip\"",
-        ))
+        .insert_header(ContentDisposition::attachment("download.zip"))
         .streaming(response_stream)
 }
