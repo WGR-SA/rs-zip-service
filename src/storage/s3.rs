@@ -2,16 +2,16 @@ use super::Storage;
 use crate::config;
 use crate::storage::FileStream;
 use crate::storage::ZipFile;
-use actix_web::web::Bytes;
+// use actix_web::web::Bytes;
 use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::Client;
-use futures::{
-    stream::Stream,
-    task::{Context, Poll},
-};
-use std::pin::Pin;
+// use futures::{
+//     stream::Stream,
+//     task::{Context, Poll},
+// };
+// use std::pin::Pin;
 use tokio::sync::mpsc;
 
 pub struct S3Storage {
@@ -44,15 +44,15 @@ impl Storage for S3Storage {
 
     async fn send_file_stream(
         &self,
-        sender: &mpsc::Sender<FileStream>,
-        path: String,
+        _sender: &mpsc::Sender<FileStream>,
+        _path: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let region_provider = RegionProviderChain::default_provider().or_else("eu-central-1");
         let aws_config = aws_config::defaults(BehaviorVersion::latest())
             .region(region_provider)
             .load()
             .await;
-        let client = Client::new(&aws_config);
+        let _client = Client::new(&aws_config);
 
         // let mut object = client
         //     .get_object()

@@ -3,14 +3,9 @@ use crate::config;
 use crate::storage::FileStream;
 use crate::storage::ZipFile;
 use async_trait::async_trait;
-use bytes::Bytes;
-use futures::StreamExt;
 use futures::TryStreamExt;
-use reqwest::{self, Error};
-use tokio::fs::File;
-use tokio::io::{self, AsyncWriteExt};
+use reqwest;
 use tokio::sync::mpsc;
-use tokio_util::codec::{BytesCodec, FramedRead}; // Import StreamExt
 
 pub struct OpenstackStorage {
     pub config: config::StorageConfig,

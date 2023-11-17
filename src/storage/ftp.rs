@@ -25,8 +25,8 @@ impl Storage for FtpStorage {
 
     async fn send_file_stream(
         &self,
-        sender: &mpsc::Sender<FileStream>,
-        path: String,
+        _sender: &mpsc::Sender<FileStream>,
+        _path: String,
     ) -> Result<(), Box<dyn std::error::Error>> {
         Ok(())
     }
