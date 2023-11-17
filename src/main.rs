@@ -66,7 +66,7 @@ async fn main() -> std::io::Result<()> {
     println!("hello");
 
     HttpServer::new(|| {
-        let cors = Cors::permissive();
+        // let cors = Cors::permissive();
         // .allowed_origin("*")
         // .allowed_methods(vec!["GET", "POST"])
         // .allowed_headers(vec![
@@ -77,7 +77,7 @@ async fn main() -> std::io::Result<()> {
         // ])
         // .max_age(3600);
 
-        App::new().wrap(cors).service(get_files_stream_zip)
+        App::new().service(get_files_stream_zip)
     })
     .bind((
         "127.0.0.1",
