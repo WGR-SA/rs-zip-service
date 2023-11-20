@@ -2,13 +2,11 @@ pub mod config;
 pub mod storage;
 pub mod zip_stream;
 
-use actix_cors::Cors;
 use actix_web::{
     http::header::ContentDisposition, post, web, App, Error, HttpRequest, HttpResponse, HttpServer,
 };
 use async_zip::base::write::ZipFileWriter;
 use async_zip::Compression;
-use async_zip::DeflateOption;
 use async_zip::ZipEntryBuilder;
 use async_zip::ZipString;
 use bytes::Bytes;
