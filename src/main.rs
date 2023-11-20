@@ -8,6 +8,7 @@ use actix_web::{
 };
 use async_zip::base::write::ZipFileWriter;
 use async_zip::Compression;
+use async_zip::DeflateOption;
 use async_zip::ZipEntryBuilder;
 use async_zip::ZipString;
 use bytes::Bytes;
@@ -38,7 +39,7 @@ impl AsyncWrite for CustomWriter {
         buf: &[u8],
     ) -> Poll<Result<usize, std::io::Error>> {
         let data: Bytes = Bytes::copy_from_slice(&buf);
-        println!("Writing {:?} bytes", buf.len());
+        //println!("Writing {:?} bytes", buf.len());
         match self.sender.try_send(data) {
             Ok(_) => Poll::Ready(Ok(buf.len())),
             Err(_) => {
@@ -65,26 +66,13 @@ async fn main() -> std::io::Result<()> {
     dotenv().ok(); // Load variables from `.env`
     println!("hello");
 
-    HttpServer::new(|| {
-        // let cors = Cors::permissive();
-        // .allowed_origin("*")
-        // .allowed_methods(vec!["GET", "POST"])
-        // .allowed_headers(vec![
-        //     http::header::AUTHORIZATION,
-        //     http::header::ACCEPT,
-        //     http::header::CONTENT_TYPE,
-        //     http::header::HeaderName::from_static("X-Client"),
-        // ])
-        // .max_age(3600);
-
-        App::new().service(get_files_stream_zip)
-    })
-    .bind((
-        "127.0.0.1",
-        env::var("PORT").unwrap().parse::<u16>().unwrap(),
-    ))?
-    .run()
-    .await
+    HttpServer::new(|| App::new().service(get_files_stream_zip))
+        .bind((
+            "127.0.0.1",
+            env::var("PORT").unwrap().parse::<u16>().unwrap(),
+        ))?
+        .run()
+        .await
 }
 
 #[post("/zip")]
