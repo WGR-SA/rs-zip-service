@@ -1,6 +1,6 @@
 pub mod config;
 pub mod storage;
-pub mod zip_stream;
+pub mod zip;
 
 use actix_web::{
     http::header::ContentDisposition, post, web, App, Error, HttpRequest, HttpResponse, HttpServer,
@@ -9,60 +9,16 @@ use async_zip::base::write::ZipFileWriter;
 use async_zip::Compression;
 use async_zip::ZipEntryBuilder;
 use async_zip::ZipString;
-use bytes::Bytes;
 use dotenv::dotenv;
+use futures::io::AsyncWriteExt;
 use futures::stream::StreamExt;
-use futures::{io::AsyncWrite, io::AsyncWriteExt};
 use std::env;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-
-pub struct CustomWriter {
-    sender: mpsc::Sender<bytes::Bytes>,
-}
-
-impl CustomWriter {
-    // Fields to hold state and possibly communicate with the response stream
-    pub fn new(o_sender: mpsc::Sender<bytes::Bytes>) -> CustomWriter {
-        CustomWriter { sender: o_sender }
-    }
-}
-
-impl AsyncWrite for CustomWriter {
-    fn poll_write(
-        self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-        buf: &[u8],
-    ) -> Poll<Result<usize, std::io::Error>> {
-        let data: Bytes = Bytes::copy_from_slice(&buf);
-        //println!("Writing {:?} bytes", buf.len());
-        match self.sender.try_send(data) {
-            Ok(_) => Poll::Ready(Ok(buf.len())),
-            Err(_) => {
-                // The channel might be full or closed. In either case, register for wakeup
-                // and return Pending.
-                println!("Retry");
-                cx.waker().wake_by_ref();
-                Poll::Pending
-            }
-        }
-    }
-
-    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-        Poll::Ready(Ok(()))
-    }
-
-    fn poll_close(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), std::io::Error>> {
-        Poll::Ready(Ok(()))
-    }
-}
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv().ok(); // Load variables from `.env`
-    println!("hello");
 
     HttpServer::new(|| App::new().service(get_files_stream_zip))
         .bind((
@@ -85,31 +41,41 @@ async fn get_files_stream_zip(req: HttpRequest, body: web::Json<Vec<String>>) ->
     if !storage_instance.connect().await {
         return HttpResponse::InternalServerError().body("Error connecting to storage");
     }
-    let (i_sender, mut i_receiver) = mpsc::channel(100);
-    let (o_sender, o_receiver) = mpsc::channel::<bytes::Bytes>(10000);
 
-    let response_stream = ReceiverStream::new(o_receiver).map(Ok::<_, Error>);
-    let writer = CustomWriter::new(o_sender);
+    let (input_sender, mut input_receiver) = mpsc::channel(200);
+    let (output_sender, output_receiver) = mpsc::channel::<bytes::Bytes>(10000);
+    let (error_channel_sender, mut error_channel_receiver) = mpsc::channel::<String>(100);
+
+    let response_stream = ReceiverStream::new(output_receiver).map(Ok::<_, Error>);
+
+    let writer = zip::writer::ZipWriter::new(output_sender);
     let mut zip = ZipFileWriter::new(writer);
 
     for path in body.into_inner() {
-        if let Err(_) = storage_instance.send_file_stream(&i_sender, path).await {
+        if let Err(_) = storage_instance.send_file_stream(&input_sender, path).await {
             return HttpResponse::InternalServerError().body("Error sending file stream");
         }
     }
 
     tokio::spawn(async move {
-        while let Some(file_stream) = i_receiver.recv().await {
-            println!("Sending {:?} to zip", file_stream.name);
+        while let Some(file_stream) = input_receiver.recv().await {
             let mut stream = file_stream.stream;
             let entry =
                 ZipEntryBuilder::new(ZipString::from(file_stream.name), Compression::Deflate);
             let mut entry_writer = match zip.write_entry_stream(entry).await {
                 Ok(writer) => writer,
-                Err(_) => return,
+                Err(_) => {
+                    let _ = error_channel_sender
+                        .send("Error writing entry".to_string())
+                        .await;
+                    return;
+                }
             };
             while let Some(Ok(chunk)) = stream.next().await {
                 if let Err(_) = entry_writer.write_all(&chunk).await {
+                    let _ = error_channel_sender
+                        .send("Error writing chunk".to_string())
+                        .await;
                     return;
                 }
             }
@@ -118,7 +84,10 @@ async fn get_files_stream_zip(req: HttpRequest, body: web::Json<Vec<String>>) ->
 
         zip.close().await.unwrap();
     });
-    println!("Stream opened");
+
+    // if let Some(error) = error_channel_receiver.recv().await {
+    //     return HttpResponse::InternalServerError().body(error);
+    // }
 
     HttpResponse::Ok()
         .content_type("application/zip")

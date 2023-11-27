@@ -2,7 +2,6 @@ use super::Storage;
 use crate::config;
 use crate::storage::FileStream;
 use crate::storage::ZipFile;
-// use actix_web::web::Bytes;
 use async_stream::stream;
 use async_trait::async_trait;
 use aws_config::meta::region::RegionProviderChain;
