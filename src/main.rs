@@ -44,7 +44,6 @@ async fn get_files_stream_zip(req: HttpRequest, body: web::Json<Vec<String>>) ->
 
     let (input_sender, mut input_receiver) = mpsc::channel(200);
     let (output_sender, output_receiver) = mpsc::channel::<bytes::Bytes>(10000);
-    let (error_channel_sender, mut error_channel_receiver) = mpsc::channel::<String>(100);
 
     let response_stream = ReceiverStream::new(output_receiver).map(Ok::<_, Error>);
 
@@ -64,18 +63,10 @@ async fn get_files_stream_zip(req: HttpRequest, body: web::Json<Vec<String>>) ->
                 ZipEntryBuilder::new(ZipString::from(file_stream.name), Compression::Deflate);
             let mut entry_writer = match zip.write_entry_stream(entry).await {
                 Ok(writer) => writer,
-                Err(_) => {
-                    let _ = error_channel_sender
-                        .send("Error writing entry".to_string())
-                        .await;
-                    return;
-                }
+                Err(_) => return,
             };
             while let Some(Ok(chunk)) = stream.next().await {
                 if let Err(_) = entry_writer.write_all(&chunk).await {
-                    let _ = error_channel_sender
-                        .send("Error writing chunk".to_string())
-                        .await;
                     return;
                 }
             }
@@ -84,10 +75,6 @@ async fn get_files_stream_zip(req: HttpRequest, body: web::Json<Vec<String>>) ->
 
         zip.close().await.unwrap();
     });
-
-    // if let Some(error) = error_channel_receiver.recv().await {
-    //     return HttpResponse::InternalServerError().body(error);
-    // }
 
     HttpResponse::Ok()
         .content_type("application/zip")
